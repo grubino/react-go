@@ -1,29 +1,29 @@
-var Board = function(size) {
-    this.current_color = Board.BLACK;
-    this.size = size;
-    this.board = this.create_board(size);
-    this.last_move_passed = false;
-    this.in_atari = false;
-    this.attempted_suicide = false;
+var Space = function(color, players) {
+    this.color = typeof color !== 'undefined' ? color : -1;
+    this.players = typeof players !== 'undefined' ? players : [];
 };
 
-Board.EMPTY = 0;
-Board.BLACK = 1;
-Board.WHITE = 2;
-
-/*
- * Returns a size x size matrix with all entries initialized to Board.EMPTY
- */
-Board.prototype.create_board = function(size) {
-    var m = [];
-    for (var i = 0; i < size; i++) {
-        m[i] = [];
-        for (var j = 0; j < size; j++)
-            m[i][j] = Board.EMPTY;
+var Board = function(player_count) {
+    this.path = [];
+    this.player_count = player_count;
+    for (var i = 0; i < 17 * player_count + 1; i++) {
+	var space = new Space(this.slide_color(i), []);
+	this.path.push(space);
     }
-    return m;
 };
 
+Board.prototype.slide_color = function(i) {
+    
+}
+
+Board.prototype.has_banana_card = function(i) {
+    var modulus = (i < 4 * this.player_count) ? false : (i < 8 * this.player_count) ? 4 : (i < 11 * this.player_count) ? 3 : false;
+    var translate = (i >= 8 * this.player_count) && (i < 11 * this.player_count) ? 2 : 0;
+    if(!modulus) {
+	return false;
+    }
+    return ((i + translate) % modulus === 0);
+}
 /*
  * Switches the current player
  */
