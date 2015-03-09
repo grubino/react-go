@@ -1,14 +1,178 @@
 var BoardView = function(player_count) {
 
-    this.view = SVG('board').size(2000, 2000);
+    this.view = SVG('canvas').size(3 * Math.round(window.innerWidth / 4), 3 * Math.round(window.innerHeight / 4));
     this.layer_coord = [];
     this.board = new Board(player_count);
 
-    this.layer_scale = 0.2;
-    this.layer_side_length = 1000;
+    this.layer_scale = 0.17;
+    this.layer_side_length = Math.round(3 * window.innerHeight / 8);
     this.layer = [];
     this.path_layer = [];
+    this.monkey_spot = [];
+    this.card_spot = [];
+    this.slide_spot = [];
+    this.start_spot = [];
+    this.current_moves = [];
+    this.selected_spot = 0;
 
+    this._compute_board_positions(player_count);
+    this._render_board(player_count);
+
+}
+
+BoardView.prototype.highlight_spot = function(spot) {
+    return spot.animate(500).radius(100).fill('white').loop();
+}
+
+BoardView.prototype.clear_highlights = function() {
+    this.monkey_spot_view.forEach(function(s) { s.stop().size(20); });
+}
+
+BoardView.prototype._calculate_moves = function(rolls) {
+    if(rolls.length == 1) {
+	this.current_moves.push(rolls[0]);
+	return;
+    } else {
+	this.current_moves.push(rolls.reduce(function(a, b) { return a + b; }, 0));
+    }
+    for(var i = 0; i < rolls.length; i++) {
+	var new_rolls = rolls.slice(0).splice(i, 1);
+	this._calculate_moves(new_rolls);
+    }
+}
+
+BoardView.prototype.put_dice_roll = function(values) {
+    this.current_moves = [];
+    this._calculate_moves(values);
+}
+
+BoardView.prototype.show_valid_moves = function() {
+    this.clear_highlights();
+    var index = this.selected_spot;
+    var current_color = this.board.current_color;
+    var space = this.board.path[index];
+    var valid_monkeys = space.players.filter(function(monkey) { return monkey == current_color; }).reduce(function(a, b) { return a + 1; }, 0);
+    if(index == this.board.player_slides[0][current_color]) {
+	valid_monkeys += this.board.monkey_starts[current_color];
+    }
+    if(valid_monkeys > 0) {
+	for(var i = 0; i < this.current_moves.length; i++) {
+	    var move = this.current_moves[i];
+	    if(index + move < this.board.size) {
+		this.highlight_spot(this.monkey_spot_view[this.board.player_paths[current_color][(index + move)]]);
+		
+	    }
+	}
+    }
+}
+
+BoardView.prototype.make_spot_selectable = function(index) {
+    this.monkey_spot_view[index].click(this.move_monkey.bind(this, index));
+}
+
+BoardView.prototype.make_spot_unselectable = function(index) {
+    this.monkey_spot_view[index].click(null);
+}
+
+BoardView.prototype.monkify = function(spot, color) {
+    return this.monkey_spot_view.clone().move(spot[0], spot[1]).fill(this.board.colors[color]).size(50);
+}
+
+BoardView.prototype._move_monkey_view_one = function(color, start, indices) {
+    this.monkey_view[start][indices[0]].animate(500).move(this.monkey_spot[this.board.player_paths[color][start+1]][0],
+							  this.monkey_spot[this.board.player_paths[color][start+1]][1]);
+    for(i in index) {
+	this.monkey_view[start+1].push(this.monkey_view[start][i]);
+	this.monkey_view[start][i] = null;
+    }
+}
+
+BoardView.prototype.move_monkey = function(color, start, dist, monkey_count, start_move) {
+
+    if(!this.board.play(color, start, end, monkey_count, start_move)) {
+	// exception - TODO throw something
+	return;
+    }
+    var start_spot = this.monkey_spot[start];
+
+    if(start == this.board.player_slides[0][color] && start_move) {
+	var monkey_view = this.monkify(start_spot, color);
+	this.monkey_view[start].push(monkey_view);
+    }
+
+    for(var i = 0; i < dist; i++) {
+	indices = [];
+	this._move_monkey_one(color, start, indices);
+    }
+    
+}
+
+BoardView.prototype._select_monkey = function(index) {
+    this.selected_spot = index;
+    this.highlight_spot(this.monkey_spot_view[index]);
+}
+
+BoardView.prototype._render_board = function(player_count) {
+
+    var layer_colors = ['#7a0', '#0a6', '#a92', '#aa4', '#880', '#dd0'];
+    this.layer_view = this.layer.map(function (layer) { 
+	    var color = layer_colors.shift();
+	    return this.view.polygon(layer.reduce(function(a, b) { 
+			return a != "" ? a + " " + b.toString() : b.toString(); 
+		    }, "")).fill(color); 
+	}, this);
+
+    this.path_view = this.path_layer.map(function (path_layer) { 
+	    path_view = this.view.polygon(path_layer.reduce(function(a, b) { 
+			return a != "" ? a + " " + b.toString() : b.toString(); 
+		    }, "")).fill('none').stroke({width: 4, opacity: 0.6});
+	    return path_view;
+	}, this);
+
+    this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot) {
+	    return this.view.circle(20).move(monkey_spot[0] - 10, monkey_spot[1] - 10).fill('#000');
+	}, this);
+    this.monkey_view = this.monkey_spot.map(function (monkey_spot) {
+	    return [];
+	});
+
+    this.slide_spot_view = [];
+    
+    for(var i = 0; i < this.slide_spot.length; i++) {
+	slide_spot = this.slide_spot[i];
+	this.slide_spot_view.push(this.view.line(slide_spot.vert[0],
+						 slide_spot.vert[1],
+						 slide_spot.target[0],
+						 slide_spot.target[1]).stroke({width: 10, color: slide_spot.color}));
+    }
+
+    this.card_spot_view = this.card_spot.map(function (card_spot) {
+	    return this.view.circle(50).move(card_spot[0] - 25, card_spot[1] - 25).fill('yellow');
+	}, this);
+
+    this.start_spot_view = [];
+    this.start_spot_text_view = [];
+    for(var i = 0; i < this.board.player_count; i++) {
+	this.start_spot_view.unshift(this.view.circle(100)
+				     .fill(this.board.color[i])
+				     .stroke({color: 'black', width: 10})
+				     .move(this.start_spot[i][0], this.start_spot[i][1])
+				     .click(this._select_monkey.bind(this, this.board.player_paths[i][this.board.ring_size[0]-1])));
+
+	this.start_spot_text_view.unshift(this.view.text('x '+this.board.monkey_starts[i])
+					  .fill('black')
+					  .size(40)
+					  .move(this.start_spot[i][0] + 150, this.start_spot[i][1] + 40));
+    }
+
+}
+
+BoardView.prototype._compute_board_positions = function(player_count) {
+    
+    for(var i = 0; i < player_count; i++) {
+	this.start_spot.unshift([(this.layer_side_length)*Math.cos(((i+1)%player_count) * 2*Math.PI / player_count - Math.PI / (player_count)) + this.layer_side_length, 
+				 (this.layer_side_length)*Math.sin(((i+1)%player_count) * 2*Math.PI / player_count - Math.PI / (player_count)) + this.layer_side_length]);
+    }
     for(var i = 0; i < this.board.ring_size.length - 1; i++) {
 
 	this.layer.push([]);
@@ -24,24 +188,48 @@ var BoardView = function(player_count) {
 			       ((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.sin(j * 2*Math.PI / player_count) +
 			       this.layer_side_length];
 	    this.path_layer[i].push(path_vertex);
+
 	}
 
     }
 
-    this.layer_view = this.layer.map(function (layer) { 
-	    return this.view.polygon(layer.reduce(function(a, b) { 
-			return a != "" ? a + " " + b.toString() : b.toString(); 
-		    }, "")).fill('#'+Math.floor(Math.random()*16777215).toString(16)); 
-	}, this);
+    for(var i = 0; i < this.board.ring_size.length; i++) {
+	for(var j = 0; j < player_count; j++) {
+	    var side_length = Math.floor(this.board.ring_size[i] / player_count);
+	    var magnitude_increment = (1 / side_length);
+	    var m_0 = 0.5 * magnitude_increment;
+	    for(var k = 0; k < side_length; k++) {
+		var spot_vertex = [Math.floor((m_0 + magnitude_increment * k) * (this.path_layer[i][(j+1)%player_count][0] - 
+										 this.path_layer[i][j][0]) + this.path_layer[i][j][0]),
+				   Math.floor((m_0 + magnitude_increment * k) * (this.path_layer[i][(j+1)%player_count][1] - 
+										 this.path_layer[i][j][1]) + this.path_layer[i][j][1])];
 
+		this.monkey_spot.push(spot_vertex);
 
-    this.path_view = this.path_layer.map(function (path_layer) { 
-	    return this.view.polygon(path_layer.reduce(function(a, b) { 
-			return a != "" ? a + " " + b.toString() : b.toString(); 
-		    }, "")).fill('none').stroke({width: 4, opacity: 0.2});
-	}, this);
+		var path_index = this.board.ring_size.slice(0, i).reduce(function (a, b) { return a+b; }, 0) + side_length * j + k;
+		if(this.board.has_banana_card(path_index)) {
+		    this.card_spot.push(spot_vertex);
+		}
+		var slide_color = this.board.slide_color(path_index);
+		if(slide_color != -1) {
+		    this.slide_spot.push({vert: spot_vertex, color: this.board.color[slide_color]});
+		}
+	    }
+	}
+    }
+
+    this.monkey_spot.push([this.layer_side_length, this.layer_side_length]);
+
+    var slide_targets_done = 0;
+    for(var i = 0; i < this.monkey_spot.length; i++) {
+	var slide_color = this.board.slide_color(i);
+	if(slide_color != -1) {
+	    var board_level = this.board.level(i);
+	    var slide_target_index = this.board.player_slide_targets[board_level][slide_color];
+	    this.slide_spot[slide_targets_done].target = this.monkey_spot[slide_target_index];
+	    slide_targets_done++;
+	}
+    }
 
 }
-
-var board_view = new BoardView(3);
 
