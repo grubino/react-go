@@ -1,31 +1,40 @@
 var BoardView = function(player_count) {
 
-    this.view = SVG('canvas').size(3 * Math.round(window.innerWidth / 4), 3 * Math.round(window.innerHeight / 4));
-    this.layer_coord = [];
+    this.canvas_width = 3 * Math.round(window.innerWidth / 4);
+    this.canvas_height = 3 * Math.round(window.innerHeight / 4);
+    this.scene = new THREE.Scene();
+    this.view = new THREE.PerspectiveCamera(75, this.canvas_width / this.canvas_height, 0.1, 1000);
+    this.renderer = new THREE.WebGLRenderer();
+    this.view.position.z = 50;
+
     this.board = new Board(player_count);
 
+    this.layer_thickness = 10;
     this.layer_scale = 0.17;
-    this.layer_side_length = Math.round(3 * window.innerHeight / 8);
+    this.layer_radius = Math.round(3 * window.innerHeight / 8);
     this.layer = [];
     this.path_layer = [];
     this.monkey_spot = [];
+    this.monkey_spot_size = Math.round(this.canvas_width / 50);
     this.card_spot = [];
+    this.card_spot_size = Math.round(this.canvas_width / 40);
     this.slide_spot = [];
     this.start_spot = [];
+    this.start_spot_size = Math.round(this.canvas_width / 30);
     this.current_moves = [];
     this.selected_spot = 0;
 
     this._compute_board_positions(player_count);
-    this._render_board(player_count);
+    this._create_board(player_count);
+    this._populate_scene();
+    this._render_board();
 
 }
 
 BoardView.prototype.highlight_spot = function(spot) {
-    return spot.animate(500).radius(100).fill('white').loop();
 }
 
 BoardView.prototype.clear_highlights = function() {
-    this.monkey_spot_view.forEach(function(s) { s.stop().size(20); });
 }
 
 BoardView.prototype._calculate_moves = function(rolls) {
@@ -60,31 +69,18 @@ BoardView.prototype.show_valid_moves = function() {
 	    var move = this.current_moves[i];
 	    if(index + move < this.board.size) {
 		this.highlight_spot(this.monkey_spot_view[this.board.player_paths[current_color][(index + move)]]);
-		
 	    }
 	}
     }
 }
 
 BoardView.prototype.make_spot_selectable = function(index) {
-    this.monkey_spot_view[index].click(this.move_monkey.bind(this, index));
 }
 
 BoardView.prototype.make_spot_unselectable = function(index) {
-    this.monkey_spot_view[index].click(null);
-}
-
-BoardView.prototype.monkify = function(spot, color) {
-    return this.monkey_spot_view.clone().move(spot[0], spot[1]).fill(this.board.colors[color]).size(50);
 }
 
 BoardView.prototype._move_monkey_view_one = function(color, start, indices) {
-    this.monkey_view[start][indices[0]].animate(500).move(this.monkey_spot[this.board.player_paths[color][start+1]][0],
-							  this.monkey_spot[this.board.player_paths[color][start+1]][1]);
-    for(i in index) {
-	this.monkey_view[start+1].push(this.monkey_view[start][i]);
-	this.monkey_view[start][i] = null;
-    }
 }
 
 BoardView.prototype.move_monkey = function(color, start, dist, monkey_count, start_move) {
@@ -96,8 +92,7 @@ BoardView.prototype.move_monkey = function(color, start, dist, monkey_count, sta
     var start_spot = this.monkey_spot[start];
 
     if(start == this.board.player_slides[0][color] && start_move) {
-	var monkey_view = this.monkify(start_spot, color);
-	this.monkey_view[start].push(monkey_view);
+	// put a new monkey onto the board
     }
 
     for(var i = 0; i < dist; i++) {
@@ -112,66 +107,63 @@ BoardView.prototype._select_monkey = function(index) {
     this.highlight_spot(this.monkey_spot_view[index]);
 }
 
-BoardView.prototype._render_board = function(player_count) {
+BoardView.prototype._render_board = function() {
+    requestAnimationFrame(BoardView.prototype._render_board.bind(this));
+    this.renderer.render(this.scene, this.view);
+}
 
-    var layer_colors = ['#7a0', '#0a6', '#a92', '#aa4', '#880', '#dd0'];
+BoardView.prototype._populate_scene = function() {
+    this.layer_view.forEach(function(view) { this.scene.add(view); }, this);
+}
+
+BoardView.prototype._create_board = function(player_count) {
+
     this.layer_view = this.layer.map(function (layer) { 
-	    var color = layer_colors.shift();
-	    return this.view.polygon(layer.reduce(function(a, b) { 
-			return a != "" ? a + " " + b.toString() : b.toString(); 
-		    }, "")).fill(color); 
-	}, this);
+	var layer_view = new THREE.Shape(layer);
+	var extrude_path = new THREE.SplineCurve3([new THREE.Vector3(0, 0, layer[0].z),
+						   new THREE.Vector3(0, 0, layer[0].z + this.layer_thickness)]);
+	var geometry = layer_view.extrude({steps: 3, bevelEnabled: false, extrudePath: extrude_path});
+	var material = new THREE.MeshLambertMaterial({color: 0xaa0000, wireframe: false});
+	return new THREE.Mesh(geometry, material);
+    }, this);
 
     this.path_view = this.path_layer.map(function (path_layer) { 
-	    path_view = this.view.polygon(path_layer.reduce(function(a, b) { 
-			return a != "" ? a + " " + b.toString() : b.toString(); 
-		    }, "")).fill('none').stroke({width: 4, opacity: 0.6});
-	    return path_view;
-	}, this);
+	return new THREE.Path(path_layer);
+    }, this);
 
     this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot) {
-	    return this.view.circle(20).move(monkey_spot[0] - 10, monkey_spot[1] - 10).fill('#000');
-	}, this);
+	var spot_size = this.monkey_spot_size;
+	var geometry = new THREE.SphereGeometry(spot_size, 10, 10);
+	var material = new THREE.MeshBasicMaterial({color: 0x000000});
+	return new THREE.Mesh(geometry, material);
+    }, this);
     this.monkey_view = this.monkey_spot.map(function (monkey_spot) {
-	    return [];
-	});
+	return [];
+    });
 
-    this.slide_spot_view = [];
-    
-    for(var i = 0; i < this.slide_spot.length; i++) {
-	slide_spot = this.slide_spot[i];
-	this.slide_spot_view.push(this.view.line(slide_spot.vert[0],
-						 slide_spot.vert[1],
-						 slide_spot.target[0],
-						 slide_spot.target[1]).stroke({width: 10, color: slide_spot.color}));
-    }
+    this.slide_spot_view = this.slide_spot.map(function (slide_spot) {
+	return new THREE.Path(slide_spot.vertices);
+    });
 
     this.card_spot_view = this.card_spot.map(function (card_spot) {
-	    return this.view.circle(50).move(card_spot[0] - 25, card_spot[1] - 25).fill('yellow');
-	}, this);
+	var spot_size = this.card_spot_size;
+	var geometry = new THREE.SphereGeometry(spot_size, 10, 10);
+	var material = new THREE.MeshBasicMaterial({color: 0xaaaa00});
+	return new THREE.Mesh(geometry, material);
+    }, this);
 
     this.start_spot_view = [];
     this.start_spot_text_view = [];
-    for(var i = 0; i < this.board.player_count; i++) {
-	this.start_spot_view.unshift(this.view.circle(100)
-				     .fill(this.board.color[i])
-				     .stroke({color: 'black', width: 10})
-				     .move(this.start_spot[i][0], this.start_spot[i][1])
-				     .click(this._select_monkey.bind(this, this.board.player_paths[i][this.board.ring_size[0]-1])));
-
-	this.start_spot_text_view.unshift(this.view.text('x '+this.board.monkey_starts[i])
-					  .fill('black')
-					  .size(40)
-					  .move(this.start_spot[i][0] + 150, this.start_spot[i][1] + 40));
-    }
+    for(var i = 0; i < this.board.player_count; i++) {}
 
 }
 
 BoardView.prototype._compute_board_positions = function(player_count) {
     
     for(var i = 0; i < player_count; i++) {
-	this.start_spot.unshift([(this.layer_side_length)*Math.cos(((i+1)%player_count) * 2*Math.PI / player_count - Math.PI / (player_count)) + this.layer_side_length, 
-				 (this.layer_side_length)*Math.sin(((i+1)%player_count) * 2*Math.PI / player_count - Math.PI / (player_count)) + this.layer_side_length]);
+	this.start_spot.unshift(new THREE.Vector3((this.layer_radius)*Math.cos(((i+1)%player_count) * 2*Math.PI / player_count - Math.PI / (player_count)), 
+						  (this.layer_radius)*Math.sin(((i+1)%player_count) * 2*Math.PI / player_count - Math.PI / (player_count)),
+						  0));
     }
     for(var i = 0; i < this.board.ring_size.length - 1; i++) {
 
@@ -179,14 +171,14 @@ BoardView.prototype._compute_board_positions = function(player_count) {
 	this.path_layer.push([]);
 
 	for(var j = 0; j < player_count; j++) {
-	    var vertex = [((1 - i*this.layer_scale)*(this.layer_side_length))*Math.cos(j * 2*Math.PI / player_count) + this.layer_side_length, 
-			  ((1 - i*this.layer_scale)*(this.layer_side_length))*Math.sin(j * 2*Math.PI / player_count) + this.layer_side_length];
+	    var vertex = new THREE.Vector3(((1 - i*this.layer_scale)*(this.layer_radius))*Math.cos(j * 2*Math.PI / player_count),
+					   ((1 - i*this.layer_scale)*(this.layer_radius))*Math.sin(j * 2*Math.PI / player_count),
+					   i * this.layer_thickness);
 	    this.layer[i].push(vertex);
 
-	    var path_vertex = [((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.cos(j * 2*Math.PI / player_count) +
-			       this.layer_side_length, 
-			       ((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.sin(j * 2*Math.PI / player_count) +
-			       this.layer_side_length];
+	    var path_vertex = new THREE.Vector3(((1 - (i + 0.5)*this.layer_scale)*(this.layer_radius))*Math.cos(j * 2*Math.PI / player_count), 
+						((1 - (i + 0.5)*this.layer_scale)*(this.layer_radius))*Math.sin(j * 2*Math.PI / player_count),
+						i * this.layer_thickness);
 	    this.path_layer[i].push(path_vertex);
 
 	}
@@ -199,10 +191,11 @@ BoardView.prototype._compute_board_positions = function(player_count) {
 	    var magnitude_increment = (1 / side_length);
 	    var m_0 = 0.5 * magnitude_increment;
 	    for(var k = 0; k < side_length; k++) {
-		var spot_vertex = [Math.floor((m_0 + magnitude_increment * k) * (this.path_layer[i][(j+1)%player_count][0] - 
-										 this.path_layer[i][j][0]) + this.path_layer[i][j][0]),
-				   Math.floor((m_0 + magnitude_increment * k) * (this.path_layer[i][(j+1)%player_count][1] - 
-										 this.path_layer[i][j][1]) + this.path_layer[i][j][1])];
+		var spot_vertex = new THREE.Vector3(Math.floor((m_0 + magnitude_increment * k) * (this.path_layer[i][(j+1)%player_count][0] - 
+												  this.path_layer[i][j][0]) + this.path_layer[i][j][0]),
+						    Math.floor((m_0 + magnitude_increment * k) * (this.path_layer[i][(j+1)%player_count][1] - 
+												  this.path_layer[i][j][1]) + this.path_layer[i][j][1]),
+						    i * this.layer_thickness);
 
 		this.monkey_spot.push(spot_vertex);
 
@@ -212,13 +205,13 @@ BoardView.prototype._compute_board_positions = function(player_count) {
 		}
 		var slide_color = this.board.slide_color(path_index);
 		if(slide_color != -1) {
-		    this.slide_spot.push({vert: spot_vertex, color: this.board.color[slide_color]});
+		    this.slide_spot.push({vertices: [spot_vertex], color: this.board.color[slide_color]});
 		}
 	    }
 	}
     }
 
-    this.monkey_spot.push([this.layer_side_length, this.layer_side_length]);
+    this.monkey_spot.push(new THREE.Vector2(0, 0));
 
     var slide_targets_done = 0;
     for(var i = 0; i < this.monkey_spot.length; i++) {
@@ -226,7 +219,7 @@ BoardView.prototype._compute_board_positions = function(player_count) {
 	if(slide_color != -1) {
 	    var board_level = this.board.level(i);
 	    var slide_target_index = this.board.player_slide_targets[board_level][slide_color];
-	    this.slide_spot[slide_targets_done].target = this.monkey_spot[slide_target_index];
+	    this.slide_spot[slide_targets_done].vertices.push(this.monkey_spot[slide_target_index]);
 	    slide_targets_done++;
 	}
     }
