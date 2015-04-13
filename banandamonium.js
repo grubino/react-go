@@ -9,7 +9,7 @@ var BoardView = function(player_count) {
 
     this.layer_scale = 0.17;
     this.layer_side_length = Math.round(this.canvas_height / 3);
-    this.spot_radius = this.layer_side_length / 20;
+    this.spot_radius = this.layer_side_length / 30;
 
     this.left_padding = this.spot_radius * 5;
     this.top_padding = this.spot_radius * 5;
@@ -30,12 +30,11 @@ var BoardView = function(player_count) {
 }
 
 BoardView.prototype.highlight_spot = function(spot) {
-    this.clear_highlights();
     return spot.animate(500).radius(this.spot_radius*2).loop();
 }
 
 BoardView.prototype.clear_highlights = function() {
-    this.monkey_spot_view.forEach(function(s) { s.radius(this.spot_radius); });
+    this.monkey_spot_view.forEach(function(s) { s.animate(500).radius(this.spot_radius); }, this);
 }
 
 BoardView.prototype._calculate_moves = function(rolls) {
@@ -60,11 +59,7 @@ BoardView.prototype.show_valid_moves = function() {
     this.clear_highlights();
     var index = this.selected_spot;
     var current_color = this.board.current_color;
-    var space = this.board.path[index];
-    var valid_monkeys = space.players.filter(function(monkey) { return monkey == current_color; }).reduce(function(a, b) { return a + 1; }, 0);
-    if(index == this.board.player_slides[0][current_color]) {
-	valid_monkeys += this.board.monkey_starts[current_color];
-    }
+    var valid_monkeys = this._get_valid_monkeys(index, true);
     if(valid_monkeys > 0) {
 	for(var i = 0; i < this.current_moves.length; i++) {
 	    var move = this.current_moves[i];
@@ -108,7 +103,19 @@ BoardView.prototype.move_monkey = function(color, start, dist, monkey_count, sta
 
 BoardView.prototype._select_monkey = function(index) {
     this.selected_spot = index;
+    this.clear_highlights();
+    var moveable_monkeys = this._get_valid_monkeys(index, true);
     this.highlight_spot(this.monkey_spot_view[index]);
+}
+
+BoardView.prototype._get_valid_monkeys = function(index, include_starts) {
+    var current_color = this.board.current_color;
+    var space = this.board.path[index];
+    var valid_monkeys = space.players.filter(function(monkey) { return monkey == current_color; }).reduce(function(a, b) { return a + 1; }, 0);
+    if(index == this.board.player_slides[0][current_color] && include_starts) {
+	valid_monkeys += this.board.monkey_starts[current_color];
+    }
+    return valid_monkeys;
 }
 
 BoardView.prototype._render_board = function(player_count) {
@@ -129,8 +136,8 @@ BoardView.prototype._render_board = function(player_count) {
 	}, this);
 
     this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot) {
-	    return this.view.circle(this.spot_radius).move(monkey_spot[0] - this.spot_radius/2,
-							   monkey_spot[1] - this.spot_radius/2).fill('#000');
+	    return this.view.circle().radius(this.spot_radius).move(monkey_spot[0] - this.spot_radius,
+								    monkey_spot[1] - this.spot_radius).fill('#000');
 	}, this);
     this.monkey_view = this.monkey_spot.map(function (monkey_spot) {
 	    return [];
@@ -160,14 +167,16 @@ BoardView.prototype._render_board = function(player_count) {
 				     .fill(this.board.color[i])
 				     .stroke({color: 'black', width: this.spot_radius / 2})
 				     .move(this.start_spot[i][0], this.start_spot[i][1])
-				     .click(this._select_monkey.bind(this,
-								     this.board.player_paths[(this.board.player_count-i)%this.board.player_count][this.board.ring_size[0]-1])));
+				     .click(BoardView.prototype._select_monkey.bind(this,
+										    this.board.player_paths[(this.board.player_count-i)%this.board.player_count][this.board.ring_size[0]-1])));
 	}
 
 	this.start_spot_text_view.unshift(this.view.text('x '+this.board.monkey_starts[i])
 					  .fill('black')
 					  .size(this.spot_radius)
-					  .move(this.start_spot[i][0] + this.spot_radius, this.start_spot[i][1] + this.spot_radius));
+					  .move(this.start_spot[i][0] + this.spot_radius, this.start_spot[i][1] + this.spot_radius)
+					  .click(BoardView.prototype._select_monkey.bind(this,
+											 this.board.player_paths[(this.board.player_count-i)%this.board.player_count][this.board.ring_size[0]-1])));
     }
 
 }

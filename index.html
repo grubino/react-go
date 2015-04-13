@@ -17,16 +17,18 @@
     <script type="text/javascript" defer="defer">
       var board_view = new BoardView(5);
       function update_dice_roll(val) {
-         board_view.put_dice_roll(val);
       }
       function clear_move_hints() {
          board_view.clear_highlights();
       }
       function show_move_hints() {
-         board_view.show_valid_moves(board_view.selected_spot);
+         board_view.show_valid_moves();
       }
       function throw_dice() {
-         $t.id('dice_box').innerHtml = "<p>"+Math.floor(Math.random() * 5 + 1)+"</p>";
+         var die_one_val = Math.floor(Math.random() * 5 + 1);
+         var die_two_val = Math.floor(Math.random() * 5 + 1);
+         $t.id('dice_box').innerHTML = "<p>" + die_one_val + " " + die_two_val + "</p>";
+         board_view.put_dice_roll([die_one_val, die_two_val]);
       }
     </script>
   </body>
