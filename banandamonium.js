@@ -57,64 +57,55 @@ BoardView.prototype.put_dice_roll = function(values) {
 
 BoardView.prototype.show_valid_moves = function() {
     this.clear_highlights();
-    var index = this.selected_spot;
     var current_color = this.board.current_color;
-    var valid_monkeys = this._get_valid_monkeys(index, true);
-    if(valid_monkeys > 0) {
-	for(var i = 0; i < this.current_moves.length; i++) {
-	    var move = this.current_moves[i];
-	    if(index + move < this.board.size) {
-		this.highlight_spot(this.monkey_spot_view[this.board.player_paths[current_color][(index + move)]]);
-	    }
+    var index = this.selected_spot === -1 ? this.board.player_slides[current_color][0] : this.selected_spot;
+    for(var i = 0; i < this.current_moves.length; i++) {
+	var move = this.current_moves[i];
+	if(index + move < this.board.size) {
+	    this.highlight_spot(this.monkey_spot_view[this.board.player_paths[current_color][(index + move)]]);
+	    this.make_spot_selectable(current_color, index, move);
 	}
     }
 }
 
-BoardView.prototype.make_spot_selectable = function(index) {
-    this.monkey_spot_view[index].click(this.move_monkey.bind(this, index));
+BoardView.prototype.make_spot_selectable = function(color, index, dist) {
+    this.monkey_spot_view[index].click(this.move_monkey.bind(this, color, index, dist));
 }
 
 BoardView.prototype.make_spot_unselectable = function(index) {
     this.monkey_spot_view[index].click(null);
 }
 
-BoardView.prototype._move_monkey_view_one = function(color, start, indices) {
-    this.monkey_view[start][indices[0]].animate(500).move(this.monkey_spot[this.board.player_paths[color][start+1]][0],
-							  this.monkey_spot[this.board.player_paths[color][start+1]][1]);
-    for(i in index) {
-	this.monkey_view[start+1].push(this.monkey_view[start][i]);
-	this.monkey_view[start][i] = null;
-    }
+BoardView.prototype._move_monkey_one = function(monkey, color, start) {
+    monkey.animate(500).move(this.monkey_spot[this.board.player_paths[color][start+1]][0],
+			     this.monkey_spot[this.board.player_paths[color][start+1]][1]);
 }
 
-BoardView.prototype.move_monkey = function(color, start, dist, monkey_count, start_move) {
+BoardView.prototype.move_monkey = function(color, start, dist) {
 
-    if(!this.board.play(color, start, end, monkey_count, start_move)) {
+    if(!this.board.play(color, start, end)) {
 	// exception - TODO throw something
 	return;
     }
 
     for(var i = 0; i < dist; i++) {
-	indices = [];
-	this._move_monkey_one(color, start, indices);
+	this._move_monkey_one(color, start);
     }
     
 }
 
-BoardView.prototype._select_monkey = function(index) {
+BoardView.prototype._select_monkey = function(monkey_view, index) {
     this.selected_spot = index;
-    this.clear_highlights();
-    var moveable_monkeys = this._get_valid_monkeys(index, true);
-    this.highlight_spot(this.monkey_spot_view[index]);
+    monkey_view.animate(500).radius(this.spot_radius * 3).loop();
 }
 
-BoardView.prototype._get_valid_monkeys = function(index, include_starts) {
+BoardView.prototype._get_valid_monkeys = function(index) {
     var current_color = this.board.current_color;
+    if(index === -1) {
+	return this.board.monkey_starts[current_color];
+    }
     var space = this.board.path[index];
     var valid_monkeys = space.players.filter(function(monkey) { return monkey == current_color; }).reduce(function(a, b) { return a + 1; }, 0);
-    if(index == this.board.player_slides[0][current_color] && include_starts) {
-	valid_monkeys += this.board.monkey_starts[current_color];
-    }
     return valid_monkeys;
 }
 
@@ -163,20 +154,18 @@ BoardView.prototype._render_board = function(player_count) {
     for(var i = 0; i < this.board.player_count; i++) {
 	this.monkey_view.push([]);
 	for(var j = 0; j < this.board.monkey_starts[i]; j++) {
-	    this.monkey_view.unshift(this.view.circle(this.spot_radius * 3)
+	    var monkey_view = this.view.circle(this.spot_radius * 3)
 				     .fill(this.board.color[i])
 				     .stroke({color: 'black', width: this.spot_radius / 2})
 				     .move(this.start_spot[i][0], this.start_spot[i][1])
-				     .click(BoardView.prototype._select_monkey.bind(this,
-										    this.board.player_paths[(this.board.player_count-i)%this.board.player_count][this.board.ring_size[0]-1])));
+				     .click(BoardView.prototype._select_monkey.bind(this, monkey_view, -1));
+	    this.monkey_view.unshift(monkey_view);
 	}
 
 	this.start_spot_text_view.unshift(this.view.text('x '+this.board.monkey_starts[i])
 					  .fill('black')
 					  .size(this.spot_radius)
-					  .move(this.start_spot[i][0] + this.spot_radius, this.start_spot[i][1] + this.spot_radius)
-					  .click(BoardView.prototype._select_monkey.bind(this,
-											 this.board.player_paths[(this.board.player_count-i)%this.board.player_count][this.board.ring_size[0]-1])));
+					  .move(this.start_spot[i][0] + this.spot_radius, this.start_spot[i][1] + this.spot_radius));
     }
 
 }

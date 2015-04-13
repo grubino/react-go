@@ -106,18 +106,52 @@ Board.prototype.end_game = function() {
     console.log("GAME OVER");
 }
 
-Board.prototype.legal_move = function(color, index, pair_move) {
+Board.prototype.legal_move = function(color, start, dist) {
+
+    if(start === -1 && this.monkey_starts[color] === 0) {
+	return false;
+    } else if(this.path[start].players.filter(function(player) { return player == color; }).length === 0) {
+	return false;
+    }
+
+    var eff_start = (start === -1) ? this.player_slides[color][0] : start;
+
+    var player_path_index = this.player_paths[color].indexOf(eff_start);
+    var player_path_length = this.player_paths[color].length;
+
+    if(player_path_index + dist < player_path_length) {
+	var player_path_target_index = this.player_paths[color][player_path_index+dist];
+	var target_space = this.path[player_path_target_index];
+	if(target_space.players[0] == color) {
+	    return (target_space.players[1] != color);
+	} else {
+	    return (target_space.players[1] == color);
+	}
+    }
+
+    return false;
 
 }
 
 /*
  * return true for legal move, false otherwise
  */
-Board.prototype.play = function(color, start, end, monkey_count, start_move) {
-    if(start_move) {
+Board.prototype.play = function(color, start, dist) {
 
+    if(!this.legal_move(color, start, dist)) {
+	return false;
     }
+
+    var eff_start = (start === -1) ? this.player_slides[color][0] : start;
+    var player_path_index = this.player_paths[color].indexOf(eff_start);
+
+    if(start !== -1) {
+	this.path[start].players[this.path[start].indexOf(color)] = null;
+    }
+    this.path[this.player_paths[color][player_path_index+dist]].players.push(color);
+
     this.switch_player();
     return true;
+
 }
 
