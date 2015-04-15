@@ -10,6 +10,7 @@ var BoardView = function(player_count) {
     this.layer_scale = 0.17;
     this.layer_side_length = Math.round(this.canvas_height / 3);
     this.spot_radius = this.layer_side_length / 30;
+    this.monkey_radius = Math.round(this.spot_radius * 3 / 2);
 
     this.left_padding = this.spot_radius * 5;
     this.top_padding = this.spot_radius * 5;
@@ -22,7 +23,8 @@ var BoardView = function(player_count) {
     this.start_spot = [];
     this.monkeys = [];
     this.current_moves = [];
-    this.selected_spot = 0;
+    this.selected_spot = null;
+    this.selected_monkey = null;
 
     this._compute_board_positions(player_count);
     this._render_board(player_count);
@@ -35,6 +37,10 @@ BoardView.prototype.highlight_spot = function(spot) {
 
 BoardView.prototype.clear_highlights = function() {
     this.monkey_spot_view.forEach(function(s) { s.animate(500).radius(this.spot_radius); }, this);
+}
+
+BoardView.prototype.clear_actions = function() {
+    this.monkey_spot_view.forEach(function(s) { s.click(null); }, this);
 }
 
 BoardView.prototype._calculate_moves = function(rolls) {
@@ -58,18 +64,23 @@ BoardView.prototype.put_dice_roll = function(values) {
 BoardView.prototype.show_valid_moves = function() {
     this.clear_highlights();
     var current_color = this.board.current_color;
-    var index = this.selected_spot === -1 ? this.board.player_slides[current_color][0] : this.selected_spot;
+    var index = this.selected_spot === -1 ? -1 : this.board.player_paths[current_color].indexOf(this.selected_spot);
     for(var i = 0; i < this.current_moves.length; i++) {
 	var move = this.current_moves[i];
 	if(index + move < this.board.size) {
-	    this.highlight_spot(this.monkey_spot_view[this.board.player_paths[current_color][(index + move)]]);
-	    this.make_spot_selectable(current_color, index, move);
+	    this.highlight_spot(index === -1 ? 
+				this.monkey_spot_view[this.board.player_paths[current_color][this.board.ring_size[0]-1 + move]] 
+				: this.monkey_spot_view[this.board.player_paths[current_color][index + move]]);
+	    this.make_spot_selectable(current_color,
+				      index === -1 ? -1 : this.board.player_paths[current_color][index], move);
 	}
     }
 }
 
 BoardView.prototype.make_spot_selectable = function(color, index, dist) {
-    this.monkey_spot_view[index].click(this.move_monkey.bind(this, color, index, dist));
+    var monkey = this.selected_monkey;
+    var eff_index = index === -1 ? this.board.player_paths[color].indexOf(this.board.player_slides[color][0]) : index;
+    this.monkey_spot_view[this.board.player_paths[color][eff_index+dist]].click(this.move_monkey.bind(this, monkey, color, index, dist));
 }
 
 BoardView.prototype.make_spot_unselectable = function(index) {
@@ -77,26 +88,40 @@ BoardView.prototype.make_spot_unselectable = function(index) {
 }
 
 BoardView.prototype._move_monkey_one = function(monkey, color, start) {
-    monkey.animate(500).move(this.monkey_spot[this.board.player_paths[color][start+1]][0],
-			     this.monkey_spot[this.board.player_paths[color][start+1]][1]);
+    monkey.animate(500).move(this.monkey_spot[this.board.player_paths[color][start+1]][0] - this.monkey_radius,
+			     this.monkey_spot[this.board.player_paths[color][start+1]][1] - this.monkey_radius);
 }
 
-BoardView.prototype.move_monkey = function(color, start, dist) {
+BoardView.prototype.move_monkey = function(monkey, color, start, dist) {
 
-    if(!this.board.play(color, start, end)) {
+    var eff_start = start === -1 ? this.board.player_slides[color][0] : start;
+    if(!this.board.play(color, start, dist)) {
 	// exception - TODO throw something
 	return;
     }
+    monkey.stop().radius(this.monkey_radius);
+    var i = 0;
+    var intervalId = setInterval(function() {
+	this._move_monkey_one(monkey, color, eff_start+i);
+	i += 1;
+	if(!(i < dist)) {
+	    clearInterval(intervalId);
+	}
+    }.bind(this), 500);
 
-    for(var i = 0; i < dist; i++) {
-	this._move_monkey_one(color, start);
-    }
-    
+    monkey.click(null);
+    monkey.click(BoardView.prototype._select_monkey.bind(this, monkey, this.board.player_paths[color][start+dist], color));
+    this.clear_actions();
+    this.clear_highlights();
+
 }
 
-BoardView.prototype._select_monkey = function(monkey_view, index) {
-    this.selected_spot = index;
-    monkey_view.animate(500).radius(this.spot_radius * 3).loop();
+BoardView.prototype._select_monkey = function(monkey_view, index, color) {
+    if(color === this.board.current_color) {
+	this.selected_spot = index;
+	this.selected_monkey = monkey_view;
+	monkey_view.animate(500).radius(this.spot_radius * 3).loop();
+    }
 }
 
 BoardView.prototype._get_valid_monkeys = function(index) {
@@ -105,7 +130,9 @@ BoardView.prototype._get_valid_monkeys = function(index) {
 	return this.board.monkey_starts[current_color];
     }
     var space = this.board.path[index];
-    var valid_monkeys = space.players.filter(function(monkey) { return monkey == current_color; }).reduce(function(a, b) { return a + 1; }, 0);
+    var valid_monkeys = space.players
+	.filter(function(monkey) { return monkey == current_color; })
+	.reduce(function(a, b) { return a + 1; }, 0);
     return valid_monkeys;
 }
 
@@ -157,15 +184,15 @@ BoardView.prototype._render_board = function(player_count) {
 	    var monkey_view = this.view.circle(this.spot_radius * 3)
 				     .fill(this.board.color[i])
 				     .stroke({color: 'black', width: this.spot_radius / 2})
-				     .move(this.start_spot[i][0], this.start_spot[i][1])
-				     .click(BoardView.prototype._select_monkey.bind(this, monkey_view, -1));
-	    this.monkey_view.unshift(monkey_view);
+				     .move(this.start_spot[i][0], this.start_spot[i][1]);
+	    monkey_view.click(BoardView.prototype._select_monkey.bind(this, monkey_view, -1, i));
+	    this.monkey_view.push(monkey_view);
 	}
 
-	this.start_spot_text_view.unshift(this.view.text('x '+this.board.monkey_starts[i])
-					  .fill('black')
-					  .size(this.spot_radius)
-					  .move(this.start_spot[i][0] + this.spot_radius, this.start_spot[i][1] + this.spot_radius));
+	this.start_spot_text_view.push(this.view.text('x '+this.board.monkey_starts[i])
+				       .fill('black')
+				       .size(this.spot_radius)
+				       .move(this.start_spot[i][0] + this.spot_radius, this.start_spot[i][1] + this.spot_radius));
     }
 
 }
@@ -178,17 +205,17 @@ BoardView.prototype._compute_board_positions = function(player_count) {
 	this.path_layer.push([]);
 
 	for(var j = 0; j < player_count; j++) {
-	    var vertex = [((1 - i*this.layer_scale)*(this.layer_side_length))*Math.cos(j * 2*Math.PI / player_count) + this.layer_side_length + this.left_padding, 
-			  ((1 - i*this.layer_scale)*(this.layer_side_length))*Math.sin(j * 2*Math.PI / player_count) + this.layer_side_length + this.top_padding];
+	    var vertex = [((1 - i*this.layer_scale)*(this.layer_side_length))*Math.cos(-j * 2*Math.PI / player_count) + this.layer_side_length + this.left_padding, 
+			  ((1 - i*this.layer_scale)*(this.layer_side_length))*Math.sin(-j * 2*Math.PI / player_count) + this.layer_side_length + this.top_padding];
 	    this.layer[i].push(vertex);
 	    if(i == 0) {
 		var startSpotPos = [vertex[0] - this.spot_radius * 2, vertex[1] - this.spot_radius * 2];
-		this.start_spot[(player_count - j) % player_count] = startSpotPos;
+		this.start_spot[j] = startSpotPos;
 	    }
 
-	    var path_vertex = [((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.cos(j * 2*Math.PI / player_count) +
+	    var path_vertex = [((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.cos(-j * 2*Math.PI / player_count) +
 			       this.layer_side_length + this.left_padding, 
-			       ((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.sin(j * 2*Math.PI / player_count) +
+			       ((1 - (i + 0.5)*this.layer_scale)*(this.layer_side_length))*Math.sin(-j * 2*Math.PI / player_count) +
 			       this.layer_side_length + this.top_padding];
 	    this.path_layer[i].push(path_vertex);
 

@@ -22,6 +22,7 @@ var Board = function(player_count) {
     this.player_slides = [[], [], [], [], [], []];
     this.player_slide_targets = [[], [], [], [], []];
 
+    this.max_stack_height = 2;
     for (var i = 0; i < this.size; i++) {
 	var space = new Space([]);
 	this.path.push(space);
@@ -110,7 +111,7 @@ Board.prototype.legal_move = function(color, start, dist) {
 
     if(start === -1 && this.monkey_starts[color] === 0) {
 	return false;
-    } else if(this.path[start].players.filter(function(player) { return player == color; }).length === 0) {
+    } else if(start !== -1 && this.path[start].players.indexOf(color) === -1) {
 	return false;
     }
 
@@ -122,7 +123,9 @@ Board.prototype.legal_move = function(color, start, dist) {
     if(player_path_index + dist < player_path_length) {
 	var player_path_target_index = this.player_paths[color][player_path_index+dist];
 	var target_space = this.path[player_path_target_index];
-	if(target_space.players[0] == color) {
+	if(target_space.players.length < this.max_stack_height) {
+	    return true;
+	} else if(target_space.players[0] == color) {
 	    return (target_space.players[1] != color);
 	} else {
 	    return (target_space.players[1] == color);
@@ -131,6 +134,26 @@ Board.prototype.legal_move = function(color, start, dist) {
 
     return false;
 
+}
+
+Board.prototype.ring_progress = function(index) {
+    return index - this.ring_size.slice(0, this.level(index)).reduce(function(a, b) { return a + b; }, 0);
+}
+
+Board.prototype.slide_down_index = function(index, color) {
+    var level = this.level(index);
+    if(level === 0) {
+	var playerIndex = this.path[index].players.indexOf(color);
+	if(playerIndex === -1) {
+	    return null;
+	}
+	return -1;
+    } else if (level < 4) {
+	var slide_index = Math.ceil((this.ring_progress(index) / this.ring_size[level]) * this.ring_size[level - 1]); // TODO: calculate slide forward
+    } else {
+	var slide_index = Math.floor((this.ring_progress(index) / this.ring_size[level]) * this.ring_size[level - 1]); // TODO: calculate slide backward
+    }
+    return slide_index;
 }
 
 /*
@@ -142,6 +165,9 @@ Board.prototype.play = function(color, start, dist) {
 	return false;
     }
 
+    if(start === -1) {
+	this.monkey_starts[color]--;
+    }
     var eff_start = (start === -1) ? this.player_slides[color][0] : start;
     var player_path_index = this.player_paths[color].indexOf(eff_start);
 
@@ -149,6 +175,9 @@ Board.prototype.play = function(color, start, dist) {
 	this.path[start].players[this.path[start].indexOf(color)] = null;
     }
     this.path[this.player_paths[color][player_path_index+dist]].players.push(color);
+    if(this.path[this.player_paths[color][player_path_index+dist]].players.length > this.max_stack_height) {
+	// TODO: handle sliding
+    }
 
     this.switch_player();
     return true;
