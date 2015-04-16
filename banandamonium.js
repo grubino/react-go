@@ -64,7 +64,7 @@ BoardView.prototype.put_dice_roll = function(values) {
 BoardView.prototype.show_valid_moves = function() {
     this.clear_highlights();
     var current_color = this.board.current_color;
-    var index = this.selected_spot === -1 ? -1 : this.board.player_paths[current_color].indexOf(this.selected_spot);
+    var index = this.selected_spot === -1 ? -1 : this.selected_spot;
     for(var i = 0; i < this.current_moves.length; i++) {
 	var move = this.current_moves[i];
 	if(index + move < this.board.size) {
@@ -110,7 +110,7 @@ BoardView.prototype.move_monkey = function(monkey, color, start, dist) {
     }.bind(this), 500);
 
     monkey.click(null);
-    monkey.click(BoardView.prototype._select_monkey.bind(this, monkey, this.board.player_paths[color][start+dist], color));
+    monkey.click(BoardView.prototype._select_monkey.bind(this, monkey, eff_start+dist, color));
     this.clear_actions();
     this.clear_highlights();
 
