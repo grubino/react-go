@@ -111,17 +111,14 @@ Board.prototype.legal_move = function(color, start, dist) {
 
     if(start === -1 && this.monkey_starts[color] === 0) {
 	return false;
-    } else if(start !== -1 && this.path[start].players.indexOf(color) === -1) {
+    } else if(start !== -1 && this.path[this.player_paths[color][start]].players.indexOf(color) === -1) {
 	return false;
     }
 
     var eff_start = (start === -1) ? this.player_slides[color][0] : start;
 
-    var player_path_index = this.player_paths[color].indexOf(eff_start);
-    var player_path_length = this.player_paths[color].length;
-
-    if(player_path_index + dist < player_path_length) {
-	var player_path_target_index = this.player_paths[color][player_path_index+dist];
+    if(start + dist < this.size) {
+	var player_path_target_index = this.player_paths[color][start+dist];
 	var target_space = this.path[player_path_target_index];
 	if(target_space.players.length < this.max_stack_height) {
 	    return true;
@@ -172,11 +169,11 @@ Board.prototype.play = function(color, start, dist) {
     var player_path_index = this.player_paths[color].indexOf(eff_start);
 
     if(start !== -1) {
-	this.path[start].players[this.path[start].indexOf(color)] = null;
+	this.path[start].players.splice(this.path[start].players.indexOf(color), 1);
     }
     this.path[this.player_paths[color][player_path_index+dist]].players.push(color);
     if(this.path[this.player_paths[color][player_path_index+dist]].players.length > this.max_stack_height) {
-	// TODO: handle sliding
+	// TODO: handle bumping
     }
 
     this.switch_player();

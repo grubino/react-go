@@ -80,7 +80,7 @@ BoardView.prototype.show_valid_moves = function() {
 BoardView.prototype.make_spot_selectable = function(color, index, dist) {
     var monkey = this.selected_monkey;
     var eff_index = index === -1 ? this.board.ring_size[0]-1 : index;
-    this.monkey_spot_view[this.board.player_paths[color][eff_index+dist]].click(this.move_monkey.bind(this, monkey, color, index, dist));
+    this.monkey_spot_view[this.board.player_paths[color][eff_index+dist]].click(BoardView.prototype.move_monkey.bind(this, monkey, color, index, dist));
 }
 
 BoardView.prototype.make_spot_unselectable = function(index) {
@@ -95,24 +95,24 @@ BoardView.prototype._move_monkey_one = function(monkey, color, start) {
 BoardView.prototype.move_monkey = function(monkey, color, start, dist) {
 
     var eff_start = start === -1 ? this.board.ring_size[0] - 1 : start;
-    if(!this.board.play(color, start, dist)) {
-	// exception - TODO throw something
-	return;
-    }
-    monkey.stop().radius(this.monkey_radius);
-    var i = 0;
-    var intervalId = setInterval(function() {
-	this._move_monkey_one(monkey, color, eff_start+i);
-	i += 1;
-	if(!(i < dist)) {
-	    clearInterval(intervalId);
-	}
-    }.bind(this), 500);
+    if(this.board.play(color, start, dist)) {
 
-    monkey.click(null);
-    monkey.click(BoardView.prototype._select_monkey.bind(this, monkey, eff_start+dist, color));
-    this.clear_actions();
-    this.clear_highlights();
+	monkey.stop().radius(this.monkey_radius);
+	var i = 0;
+	var intervalId = setInterval(function() {
+	    this._move_monkey_one(monkey, color, eff_start+i);
+	    i += 1;
+	    if(!(i < dist)) {
+		clearInterval(intervalId);
+	    }
+	}.bind(this), 500);
+
+	monkey.click(null);
+	monkey.click(BoardView.prototype._select_monkey.bind(this, monkey, eff_start+dist, color));
+	this.clear_actions();
+	this.clear_highlights();
+
+    }
 
 }
 
