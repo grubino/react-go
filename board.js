@@ -29,7 +29,7 @@ var Board = function(player_count) {
 
 	var slide_color = this.slide_color(i);
 	if(slide_color != -1 && (level = this.level(i)) < this.ring_size.length) {
-	    this.player_slides[level].unshift(i);
+	    this.player_slides[level][slide_color] = i;
 	}
     }
 
@@ -37,7 +37,7 @@ var Board = function(player_count) {
 	var ring_progress = this.ring_size.slice(0, i+1).reduce(function (a, b) { return a + b; }, 0);
 	for (var j = 0; j < this.player_slides[i].length; j++) {
 	    var slide_target_index = ((this.player_slides[i+1][j] - ring_progress)+1) % this.ring_size[i+1] + ring_progress;
-	    this.player_slide_targets[i].push(slide_target_index);
+	    this.player_slide_targets[i][j] = slide_target_index;
 	}
     }
     

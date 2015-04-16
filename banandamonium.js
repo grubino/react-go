@@ -79,7 +79,7 @@ BoardView.prototype.show_valid_moves = function() {
 
 BoardView.prototype.make_spot_selectable = function(color, index, dist) {
     var monkey = this.selected_monkey;
-    var eff_index = index === -1 ? this.board.player_paths[color].indexOf(this.board.player_slides[color][0]) : index;
+    var eff_index = index === -1 ? this.board.ring_size[0]-1 : index;
     this.monkey_spot_view[this.board.player_paths[color][eff_index+dist]].click(this.move_monkey.bind(this, monkey, color, index, dist));
 }
 
@@ -94,7 +94,7 @@ BoardView.prototype._move_monkey_one = function(monkey, color, start) {
 
 BoardView.prototype.move_monkey = function(monkey, color, start, dist) {
 
-    var eff_start = start === -1 ? this.board.player_slides[color][0] : start;
+    var eff_start = start === -1 ? this.board.ring_size[0] - 1 : start;
     if(!this.board.play(color, start, dist)) {
 	// exception - TODO throw something
 	return;
@@ -153,16 +153,12 @@ BoardView.prototype._render_board = function(player_count) {
 	    return path_view;
 	}, this);
 
-    this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot) {
+    this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot, index) {
 	    return this.view.circle().radius(this.spot_radius).move(monkey_spot[0] - this.spot_radius,
-								    monkey_spot[1] - this.spot_radius).fill('#000');
+								    monkey_spot[1] - this.spot_radius).fill(this.board.has_banana_card(index) ? 'yellow' : '#000');
 	}, this);
-    this.monkey_view = this.monkey_spot.map(function (monkey_spot) {
-	    return [];
-	});
 
     this.slide_spot_view = [];
-    
     for(var i = 0; i < this.slide_spot.length; i++) {
 	slide_spot = this.slide_spot[i];
 	this.slide_spot_view.push(this.view.line(slide_spot.vert[0],
@@ -171,20 +167,16 @@ BoardView.prototype._render_board = function(player_count) {
 						 slide_spot.target[1]).stroke({width: this.spot_radius / 2, color: slide_spot.color}));
     }
 
-    this.card_spot_view = this.card_spot.map(function (card_spot) {
-	    return this.view.circle(this.spot_radius*2).move(card_spot[0] - this.spot_radius,
-							     card_spot[1] - this.spot_radius).fill('yellow');
-	}, this);
-
     this.start_spot_text_view = [];
     this.monkey_view = [];
     for(var i = 0; i < this.board.player_count; i++) {
 	this.monkey_view.push([]);
+	var color = i;
 	for(var j = 0; j < this.board.monkey_starts[i]; j++) {
 	    var monkey_view = this.view.circle(this.spot_radius * 3)
 				     .fill(this.board.color[i])
 				     .stroke({color: 'black', width: this.spot_radius / 2})
-				     .move(this.start_spot[i][0], this.start_spot[i][1]);
+				     .move(this.start_spot[color][0], this.start_spot[color][1]);
 	    monkey_view.click(BoardView.prototype._select_monkey.bind(this, monkey_view, -1, i));
 	    this.monkey_view.push(monkey_view);
 	}
@@ -237,9 +229,6 @@ BoardView.prototype._compute_board_positions = function(player_count) {
 		this.monkey_spot.push(spot_vertex);
 
 		var path_index = this.board.ring_size.slice(0, i).reduce(function (a, b) { return a+b; }, 0) + side_length * j + k;
-		if(this.board.has_banana_card(path_index)) {
-		    this.card_spot.push(spot_vertex);
-		}
 		var slide_color = this.board.slide_color(path_index);
 		if(slide_color != -1) {
 		    this.slide_spot.push({vert: spot_vertex, color: this.board.color[slide_color]});
