@@ -79,7 +79,7 @@ Board.prototype.slide_color = function(i) {
     var ring_size = this.ring_size[this.level(i)];
     var ring_progress = i - adjustment;
     var side_length = Math.round(ring_size / this.player_count);
-    return (ring_progress + 1) % side_length == 0 ? (ring_size - ring_progress - 1) / side_length : -1;
+    return (ring_progress + 1) % side_length == 0 ? (this.player_count - ((ring_size - ring_progress - 1) / side_length)) % this.player_count : -1;
 }
 
 
@@ -165,7 +165,7 @@ Board.prototype.play = function(color, start, dist) {
     if(start === -1) {
 	this.monkey_starts[color]--;
     }
-    var eff_start = (start === -1) ? this.player_slides[color][0] : start;
+    var eff_start = (start === -1) ? this.ring_size[0] - 1 : start;
 
     if(start !== -1) {
 	this.path[this.player_paths[color][start]].players.splice(this.path[this.player_paths[color][start]].players.indexOf(color), 1);
