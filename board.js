@@ -166,13 +166,12 @@ Board.prototype.play = function(color, start, dist) {
 	this.monkey_starts[color]--;
     }
     var eff_start = (start === -1) ? this.player_slides[color][0] : start;
-    var player_path_index = this.player_paths[color].indexOf(eff_start);
 
     if(start !== -1) {
-	this.path[start].players.splice(this.path[start].players.indexOf(color), 1);
+	this.path[this.player_paths[color][start]].players.splice(this.path[this.player_paths[color][start]].players.indexOf(color), 1);
     }
-    this.path[this.player_paths[color][player_path_index+dist]].players.push(color);
-    if(this.path[this.player_paths[color][player_path_index+dist]].players.length > this.max_stack_height) {
+    this.path[this.player_paths[color][eff_start+dist]].players.push(color);
+    if(this.path[this.player_paths[color][eff_start+dist]].players.length > this.max_stack_height) {
 	// TODO: handle bumping
     }
 

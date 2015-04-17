@@ -71,8 +71,7 @@ BoardView.prototype.show_valid_moves = function() {
 	    this.highlight_spot(index === -1 ? 
 				this.monkey_spot_view[this.board.player_paths[current_color][this.board.ring_size[0]-1 + move]] 
 				: this.monkey_spot_view[this.board.player_paths[current_color][index + move]]);
-	    this.make_spot_selectable(current_color,
-				      index === -1 ? -1 : this.board.player_paths[current_color][index], move);
+	    this.make_spot_selectable(current_color, index, move);
 	}
     }
 }
