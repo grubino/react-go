@@ -9,6 +9,8 @@ var Board = function(player_count) {
     this.ring_size = [4*this.player_count, 4*this.player_count, 3*this.player_count, 3*this.player_count, 2*this.player_count, 1];
     this.size = this.ring_size.reduce(function(a, b) { return a + b; }, 0);
     this.color = ['red', 'white', 'blue', 'yellow', 'orange', 'green', 'brown', 'purple'];
+    this.dice_count = 2;
+    this.turn_progress = 0;
     this.current_color = 0;
 
     // player specific board
@@ -99,7 +101,8 @@ Board.prototype.has_banana_card = function(i) {
 /*
  * Switches the current player
  */
-Board.prototype.switch_player = function() {
+Board.prototype.next_turn = function() {
+    this.turn_progress = 0;
     this.current_color = (this.current_color + 1) % this.player_count;
 }
 
@@ -156,9 +159,9 @@ Board.prototype.slide_down_index = function(index, color) {
 /*
  * return true for legal move, false otherwise
  */
-Board.prototype.play = function(color, start, dist) {
+Board.prototype.play = function(color, start, dist, dice_count) {
 
-    if(!this.legal_move(color, start, dist)) {
+    if(!this.legal_move(color, start, dist, dice_count)) {
 	return false;
     }
 
@@ -175,7 +178,10 @@ Board.prototype.play = function(color, start, dist) {
 	// TODO: handle bumping
     }
 
-    this.switch_player();
+    this.turn_progress += dice_count;
+    if(this.turn_progress >= this.dice_count) {
+	this.next_turn();
+    }
     return true;
 
 }
