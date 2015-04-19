@@ -162,11 +162,6 @@ BoardView.prototype._render_board = function(player_count) {
 	    return path_view;
 	}, this);
 
-    this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot, index) {
-	    return this.view.circle().radius(this.spot_radius).move(monkey_spot[0] - this.spot_radius,
-								    monkey_spot[1] - this.spot_radius).fill(this.board.has_banana_card(index) ? 'yellow' : '#000');
-	}, this);
-
     this.slide_spot_view = [];
     for(var i = 0; i < this.slide_spot.length; i++) {
 	slide_spot = this.slide_spot[i];
@@ -175,6 +170,11 @@ BoardView.prototype._render_board = function(player_count) {
 						 slide_spot.target[0],
 						 slide_spot.target[1]).stroke({width: this.spot_radius / 2, color: slide_spot.color}));
     }
+
+    this.monkey_spot_view = this.monkey_spot.map(function (monkey_spot, index) {
+	    return this.view.circle().radius(this.spot_radius).move(monkey_spot[0] - this.spot_radius,
+								    monkey_spot[1] - this.spot_radius).fill(this.board.has_banana_card(index) ? 'yellow' : '#000');
+	}, this);
 
     this.start_spot_text_view = [];
     this.monkey_view = [];
