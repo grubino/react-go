@@ -9,7 +9,7 @@ var BoardView = function(player_count) {
 
     this.layer_scale = 0.17;
     this.layer_side_length = Math.round(this.canvas_height / 3);
-    this.spot_radius = this.layer_side_length / 30;
+    this.spot_radius = this.layer_side_length / 40;
     this.monkey_radius = Math.round(this.spot_radius * 3 / 2);
 
     this.left_padding = this.spot_radius * 5;
@@ -21,7 +21,6 @@ var BoardView = function(player_count) {
     this.card_spot = [];
     this.slide_spot = [];
     this.start_spot = [];
-    this.monkeys = [];
     this.current_moves = [];
     this.selected_spot = null;
     this.selected_monkey = null;
@@ -46,11 +45,11 @@ BoardView.prototype.clear_actions = function() {
 BoardView.prototype._calculate_moves = function(rolls) {
     if(rolls.length == 1) {
 	this.current_moves.push({"value": rolls[0].value,
-				 "dice_count": rolls[0].dice_count});
+				 "dice": rolls[0].dice});
 	return;
     } else {
 	this.current_moves.push({"value": rolls.map(function(a) { return a.value; }).reduce(function(a, b) { return a + b; }, 0),
-				 "dice_count": rolls.map(function (a) { return a.dice_count; }).reduce(function (a, b) { return a + b; }, 0) });
+				 "dice": rolls.map(function (a) { return a.dice; }).reduce(function (a, b) { return a.concat(b); }, []) });
     }
     for(var i = 0; i < rolls.length; i++) {
 	var new_rolls = rolls.slice(0).splice(i, 1);
@@ -59,8 +58,9 @@ BoardView.prototype._calculate_moves = function(rolls) {
 }
 
 BoardView.prototype.put_dice_roll = function(values) {
+    this.dice = values;
     this.current_moves = [];
-    this._calculate_moves(values.map(function(a) { return {"value": a, "dice_count": 1}; }));
+    this._calculate_moves(values.map(function(a, i) { return {"value": a, "dice": [i]}; }));
 }
 
 BoardView.prototype.show_valid_moves = function() {
@@ -82,8 +82,7 @@ BoardView.prototype.make_spot_selectable = function(color, index, move_index) {
     var monkey = this.selected_monkey;
     var eff_index = index === -1 ? this.board.ring_size[0]-1 : index;
     var dist = this.current_moves[move_index].value;
-    var dice_count = this.current_moves[move_index].dice_count;
-    this.monkey_spot_view[this.board.player_paths[color][eff_index+dist]].click(BoardView.prototype.move_monkey.bind(this, monkey, color, index, dist, dice_count));
+    this.monkey_spot_view[this.board.player_paths[color][eff_index+dist]].click(BoardView.prototype.move_monkey.bind(this, monkey, color, index, move_index));
 }
 
 BoardView.prototype.make_spot_unselectable = function(index) {
@@ -95,10 +94,12 @@ BoardView.prototype._move_monkey_one = function(monkey, color, start) {
 			     this.monkey_spot[this.board.player_paths[color][start+1]][1] - this.monkey_radius);
 }
 
-BoardView.prototype.move_monkey = function(monkey, color, start, dist, dice_count) {
+BoardView.prototype.move_monkey = function(monkey, color, start, move_index) {
 
     var eff_start = start === -1 ? this.board.ring_size[0] - 1 : start;
-    if(this.board.play(color, start, dist, dice_count)) {
+    var dist = this.current_moves[move_index].value;
+    var dice = this.current_moves[move_index].dice.map(function(a) { return this.dice[a]; }, this);
+    if(this.board.play(color, start, dist, dice.length)) {
 
 	monkey.stop().radius(this.monkey_radius);
 	var i = 0;
@@ -112,6 +113,9 @@ BoardView.prototype.move_monkey = function(monkey, color, start, dist, dice_coun
 
 	monkey.click(null);
 	monkey.click(BoardView.prototype._select_monkey.bind(this, monkey, eff_start+dist, color));
+
+	this.put_dice_roll(this.dice.filter(function(a) { return dice.indexOf(a) === -1; }, this));
+
 	this.selected_monkey = null;
 	this.clear_actions();
 	this.clear_highlights();
@@ -124,6 +128,7 @@ BoardView.prototype._select_monkey = function(monkey_view, index, color) {
     if(color === this.board.current_color) {
 	this.selected_spot = index;
 	this.selected_monkey = monkey_view;
+	this.monkey_view.forEach(function(monkey) { monkey.animate(500).radius(this.spot_radius * 3 / 2); }, this);
 	monkey_view.animate(500).radius(this.spot_radius * 3).loop();
     }
 }
@@ -174,7 +179,6 @@ BoardView.prototype._render_board = function(player_count) {
     this.start_spot_text_view = [];
     this.monkey_view = [];
     for(var i = 0; i < this.board.player_count; i++) {
-	this.monkey_view.push([]);
 	var color = i;
 	for(var j = 0; j < this.board.monkey_starts[i]; j++) {
 	    var monkey_view = this.view.circle(this.spot_radius * 3)
